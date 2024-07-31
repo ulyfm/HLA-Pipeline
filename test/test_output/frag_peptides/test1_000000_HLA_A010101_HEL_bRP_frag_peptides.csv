@@ -1,0 +1,2 @@
+,Sequence,Annotated Sequence,Qvality q-value,Number of Protein Groups,Master Protein Accessions,Master Protein Descriptions,Protein Accessions,Sequence Length,RT in min by Search Engine Sequest HT,HLAP_sequence,HLAP_RT,HLAP_master_accessions,HLAP_protein_accessions,HLAP_master_descriptions,HLAP_length,HLAP_fragment
+13,AAAAGGAFP,[R].AAAAGGAFPR.[G],0.000342489,1,Q99523,Sortilin OS=Homo sapiens OX=9606 GN=SORT1 PE=1 SV=3,Q99523; A0A0J9YVU2,10,23.5329,AAAAGGAFP,23.5329,Q99523,Q99523; A0A0J9YVU2,Sortilin OS=Homo sapiens OX=9606 GN=SORT1 PE=1 SV=3,9,True

@@ -1,0 +1,2 @@
+,Sequence,Annotated Sequence,Qvality q-value,Number of Protein Groups,Master Protein Accessions,Master Protein Descriptions,Protein Accessions,Sequence Length,RT in min by Search Engine Sequest HT,HLAP_sequence,HLAP_RT,HLAP_master_accessions,HLAP_protein_accessions,HLAP_master_descriptions,HLAP_length
+9,AAAAELAAQK,[L].AAAAELAAQK.[R],0.000479499,1,O95926,Pre-mRNA-splicing factor SYF2 OS=Homo sapiens OX=9606 GN=SYF2 PE=1 SV=1,O95926,10,17.5177,AAAAELAAQK,17.5177,O95926,O95926,Pre-mRNA-splicing factor SYF2 OS=Homo sapiens OX=9606 GN=SYF2 PE=1 SV=1,10

@@ -1,0 +1,2 @@
+,Sequence,Annotated Sequence,Qvality q-value,Number of Protein Groups,Master Protein Accessions,Master Protein Descriptions,Protein Accessions,Sequence Length,RT in min by Search Engine Sequest HT,HLAP_sequence,HLAP_RT,HLAP_master_accessions,HLAP_protein_accessions,HLAP_master_descriptions,HLAP_length
+14,AAAAGSLSR,[A].AAAAGSLSR.[S],0.0305912,1,sp,T-box transcription factor TBX2 OS=Homo sapiens OX=9606 GN=TBX2 PE=1 SV=3,Q13207,9,12.3056,AAAAGSLSR,12.3056,sp,Q13207,T-box transcription factor TBX2 OS=Homo sapiens OX=9606 GN=TBX2 PE=1 SV=3,9
