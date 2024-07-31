@@ -49,6 +49,18 @@ pip3 install .
 ```
 Now you should be able to use the HLA-Pipeline tool from any directory by writing `hla-pipeline`.
 
+### Not working as a command (not on PATH)
+
+It is possible that you will see a warning like:
+
+```commandline
+  WARNING: The script hla-pipeline is installed in '/Users/abcde/Library/Python/3.9/bin' which is not on PATH.
+  Consider adding this directory to PATH or, if you prefer to suppress this warning, use --no-warn-script-location.
+```
+
+In this case, to run HLA Pipeline as a command-line tool, you need to add your python's bin to PATH. This is system
+and command-line specific, so please just search "how to add a folder to PATH" and then specify your OS.
+
 #### Apple Silicon
 
 There is an installation problem on new Apple computers. The installation of some of the dependencies
