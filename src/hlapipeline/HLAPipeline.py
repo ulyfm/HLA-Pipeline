@@ -9,6 +9,7 @@ from hlapipeline import LocalDatabase
 from hlapipeline.defrag import defrag
 from hlapipeline.files.OutputAdapter import OutputAdapter
 from hlapipeline.files.PeptideFileAdapter import PeptideFileAdapter
+from hlapipeline.gibbscluster.gibbscluster import gibbs_cluster
 
 
 class HLAPipeline:
@@ -48,7 +49,7 @@ class HLAPipeline:
         self._data_table = self._data_table[~self._data_table['HLAP_master_accessions'].str.contains("sp", na=False)]
         self._output.save_csv_infer_name(self._data_table, self._name_before_group, "spRM_peptides")
 
-    def remove_frag(self) -> None:
+    def remove_frag(self, class2: bool) -> None:
         """
         Uses a special defrag script to analyze whether peptides are fragments. The results are stored in a new column
         and then fragments are dropped from the table and stored in a backup file.
@@ -61,7 +62,10 @@ class HLAPipeline:
         if 'HLAP_RT' not in self._data_table.columns:
             print("Skipping frag removal due to no RT column.")
             return
-        nosp_table = defrag.defrag(self._data_table)
+        if class2:
+            nosp_table = defrag.defrag(self._data_table, max_len=36)
+        else:
+            nosp_table = defrag.defrag(self._data_table)
         self.final_row['fragment_count'] = sum(nosp_table['HLAP_fragment'])  # Final
         self._output.save_csv_infer_name(nosp_table[nosp_table['HLAP_fragment']], self._name_before_group,
                                          "frag_peptides")
@@ -195,21 +199,33 @@ class HLAPipeline:
               "including multiple matches; in", match_count - num, "groups")
         return match_count
 
-    def _generate_logos(self):
+    def _generate_logos(self, class2: bool):
         """
         Generates logo images (showing common amino acids at different positions in the peptides, scaled by frequency).
         Images are exported to <base directory>/logo_results/<HLA file name>/<n>mer_logo.png
         """
-        for i in range(8, 15):
-            mers = self._data_table[self._data_table['HLAP_length'] == i]
-            seqs = mers['HLAP_sequence'].tolist()
-            if not seqs:
-                continue
-            # print(seqs, ",", uniprot_frequency)
-            motif = compute_motif(seqs, reference_freqs=uniprot_frequency) \
-                .rename(columns=dict(zip(list(range(0, i)), list(range(1, i + 1)))))
+        if class2:
+            seqs = self._data_table['HLAP_sequence'].tolist()
+            aligned_seqs = gibbs_cluster(seqs, 9)
+            finalseqs = []
+            for (seq, index, old_index) in aligned_seqs:
+                finalseqs.append(seq[index:index + 9])
+            motif = compute_motif(finalseqs,
+                                  reference_freqs=uniprot_frequency)  # .rename(columns=dict(zip(list(range(0, i)), list(range(1, i + 1)))))
             logo_dir = self._output.init_logo_directory(self._name_before_group)
-            svg_logo(motif, os.path.join(logo_dir, str(i) + "mer_logo.svg"), color_scheme='chemistry')
+            svg_logo(motif, os.path.join(logo_dir, "9mer_logo.svg"), color_scheme='chemistry')
+
+        else:
+            for i in range(8, 15):
+                mers = self._data_table[self._data_table['HLAP_length'] == i]
+                seqs = mers['HLAP_sequence'].tolist()
+                if not seqs:
+                    continue
+                # print(seqs, ",", uniprot_frequency)
+                motif = compute_motif(seqs, reference_freqs=uniprot_frequency) \
+                    .rename(columns=dict(zip(list(range(0, i)), list(range(1, i + 1)))))
+                logo_dir = self._output.init_logo_directory(self._name_before_group)
+                svg_logo(motif, os.path.join(logo_dir, str(i) + "mer_logo.svg"), color_scheme='chemistry')
 
     def _db_data(self):
         """
@@ -248,7 +264,7 @@ class HLAPipeline:
             self._data_table.drop('HLAP_accession_' + str(i), axis=1, inplace=True)
 
     def get_result(self, skip_cleanup: bool, skip_cotransduced: bool, assumecotransduced: bool, skip_dataviz: bool,
-                   cotransduced_peptide='', database_features=False) -> dict:
+                   class2: bool, cotransduced_peptide='', database_features=False) -> dict:
         """
         Retrieve the final metadata row. This includes things such as name, date, the numbers of peptides excluded,
         and the numbers of 7-14mers included.
@@ -258,7 +274,7 @@ class HLAPipeline:
         print("File contains", len(self._data_table), "peptides")
         if not skip_cleanup:
             self.remove_sp()
-            self.remove_frag()
+            self.remove_frag(class2)
             self.remove_duplicates()
         if assumecotransduced:
             self._process_cotrans_peptide(self._peptide_file.get_cotransduced(), 0)
@@ -269,13 +285,13 @@ class HLAPipeline:
         assert len(self._data_table) == len(self._data_table.drop_duplicates(subset="HLAP_sequence"))
         self._output.save_csv_infer_name(self._data_table, self._name_before_group, "final_peptides")
         self._output.save_csv_infer_name(self._data_table[(self._data_table['HLAP_length'] >= 8)
-                                         & (self._data_table['HLAP_length'] <= 14)],
+                                                          & (self._data_table['HLAP_length'] <= 14)],
                                          self._name_before_group, "final_peptides_8-14")
         if not skip_cotransduced:
             self.identify_cotransduced(cotransduced_peptide)
         if not skip_dataviz:
             self._generate_mers_piechart()
-            self._generate_logos()
+            self._generate_logos(class2)
         return self.final_row
 
     def get_data_table(self):
