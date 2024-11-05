@@ -92,13 +92,10 @@ def gibbs_cluster(peptides: list[str], n: int, reference_frequencies=None) -> li
                 new_E = _energy_of_alignment(alignment_list, 9, normalized_reference_frequencies)
                 P = min(1.0, math.exp((new_E - current_E) / step))
                 if random.random() <= P:
-                    print("Doing move type 2")
                     current_E = new_E
                 else:
-                    print("NOT doing move type 2")
                     for i in range(len(alignment_list)):
                         alignment_list[i][1] = alignment_list[i][2]
-                print("Move type 2 prob", P, "from newE", new_E, "and oldE", current_E)
 
     print(alignment_list)
     return alignment_list
@@ -106,18 +103,41 @@ def gibbs_cluster(peptides: list[str], n: int, reference_frequencies=None) -> li
 
 def _energy_of_alignment(alignment_list: list[list[str, int, int]], n: int,
                          reference_frequencies: dict) -> float:
+
+    # Weighting: first calculate the number of different amino acids at all positions:
+    pos_count = []
+    for i in range(n):
+        pos_count.append({})
+    for i in range(n):
+        for [sequence, index, old_index] in alignment_list:
+            res = sequence[i + index]
+            if res not in pos_count[i]:
+                pos_count[i][res] = 1
+            else:
+                pos_count[i][res] += 1
+    # Weighting: next, generate weights for each seq via Henikoff/Henikoff formula.
+    weights = []
+    for [sequence, index, old_index] in alignment_list:
+        weight = 0
+        for i in range(n):
+            res = sequence[i + index]
+            weight += 1 / (len(pos_count[i]) * pos_count[i][res])
+        weights.append(weight)
+
     E = 0
     for i in range(n):
         aa_table = dict.fromkeys(reference_frequencies, 0)  # use custom reference?
-        for [sequence, index, old_index] in alignment_list:
+        total_weight = 0
+        for weight in weights:
+            total_weight += weight
+        for j in range(len(alignment_list)):
+            [sequence, index, old_index] = alignment_list[j]
             # print(sequence, index, alignment_index, i)
             loc = index + i
-            # print("Sequence length", len(sequence), "loc=", loc, "seq=", sequence)
-            aa_table[sequence[loc]] += 1
+            aa_table[sequence[loc]] += weights[j]
         for aa in aa_table.keys():
             Cpa = aa_table[aa]
-            Ppa = (aa_table[aa] + 1) / len(
-                alignment_list)  # TODO - no sequence weighting or pseudocount correction for now; just adding 1
+            Ppa = (aa_table[aa] + 0.05) / total_weight  # TODO - no sequence weighting or pseudocount correction for now; just adding 1
             Qa = reference_frequencies[aa]
             E += Cpa * math.log(Ppa / Qa)  # correct base?
     return E
