@@ -123,21 +123,28 @@ def _energy_of_alignment(alignment_list: list[list[str, int, int]], n: int,
             res = sequence[i + index]
             weight += 1 / (len(pos_count[i]) * pos_count[i][res])
         weights.append(weight)
-
+    # Calculate effective sequence number for Henikoff method:
+    alpha = 0
+    for i in range(n):
+        alpha += len(pos_count[i])
+    alpha = alpha / n - 1
+    beta = 50  # magic number for Henikoff method
     E = 0
+    total_weight = 0
+    for weight in weights:
+        total_weight += weight
     for i in range(n):
         aa_table = dict.fromkeys(reference_frequencies, 0)  # use custom reference?
-        total_weight = 0
-        for weight in weights:
-            total_weight += weight
+        aa_table_weighted = dict.fromkeys(reference_frequencies, 0)
         for j in range(len(alignment_list)):
             [sequence, index, old_index] = alignment_list[j]
             # print(sequence, index, alignment_index, i)
-            loc = index + i
-            aa_table[sequence[loc]] += weights[j]
+            aa_table[sequence[index + i]] += 1
+            aa_table_weighted[sequence[index + i]] += weights[j]
         for aa in aa_table.keys():
             Cpa = aa_table[aa]
-            Ppa = (aa_table[aa] + 0.05) / total_weight  # TODO - no sequence weighting or pseudocount correction for now; just adding 1
+            Fpa = aa_table_weighted[aa] / total_weight
+            Ppa = (alpha * Fpa + beta * 0.05) / (alpha + beta)  # TODO - no sequence weighting or pseudocount correction for now; just adding 1
             Qa = reference_frequencies[aa]
             E += Cpa * math.log(Ppa / Qa)  # correct base?
     return E
