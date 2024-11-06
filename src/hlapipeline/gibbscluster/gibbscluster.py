@@ -3,6 +3,7 @@ import math
 import random
 from copy import deepcopy
 from collections import OrderedDict
+import blosum
 
 aa_alphabet = [aa for aa in 'ARNDCQEGHILKMFPSTWYVBZX-']
 
@@ -27,6 +28,16 @@ uniprot_frequency = {'A': 8.25,
                      'Y': 2.92,
                      'V': 6.87}
 
+def _normalized_reference_frequencies(reference_frequencies):
+    normalized_reference_frequencies = {}
+    total = 0
+    for aa in reference_frequencies.keys():
+        total += reference_frequencies[aa]
+    for aa in reference_frequencies.keys():
+        normalized_reference_frequencies[aa] = reference_frequencies[aa] / total
+    return normalized_reference_frequencies
+
+normalized_uniprot = _normalized_reference_frequencies(uniprot_frequency)
 
 # Input: peptides list with length >= n
 # Input: target length n
@@ -55,7 +66,7 @@ def gibbs_cluster(peptides: list[str], n: int, reference_frequencies=None) -> li
     T_steps = 10
     # Generate a list of steps so that start and end can be defined, due to division inaccuracies
     steps_list = [T]
-    step_size = (T - T_end) / T_steps
+    step_size = (T - T_end) / (T_steps - 1)
     for i in range(1, T_steps - 1):
         steps_list.append(T - step_size * i)
     steps_list.append(T_end)
@@ -69,7 +80,11 @@ def gibbs_cluster(peptides: list[str], n: int, reference_frequencies=None) -> li
                 alignment_list[move_index][2] = alignment_list[move_index][1] # Save old value
                 alignment_list[move_index][1] = random.randint(0, len(alignment_list[move_index][0]) - n)
                 new_E = _energy_of_alignment(alignment_list,  9, normalized_reference_frequencies)
-                P = min(1.0, math.exp((new_E - current_E) / step))
+                try:
+                    P = min(1.0, math.exp((new_E - current_E) / step))
+                except OverflowError:
+                    print("newE", new_E, "currentE", current_E, "step", step)
+                    P = 0
                 if random.random() <= P:
                     current_E = new_E
                 else:
@@ -100,9 +115,27 @@ def gibbs_cluster(peptides: list[str], n: int, reference_frequencies=None) -> li
     print(alignment_list)
     return alignment_list
 
+blosum62 = blosum.BLOSUM(62)
+blosum62_probability = {}
+aa_table = dict.fromkeys(uniprot_frequency, 0)
+sum_ab = 0
+for aa in aa_table.keys():
+    blosum62_probability[aa] = dict()
+    for bb in aa_table.keys():
+        # print(aa, bb)
+        Sab = blosum62[aa][bb]
+        Qb = normalized_uniprot[bb]
+        Qa = normalized_uniprot[aa]
+        Qab = Qb * Qa * math.exp(Sab * 0.31723)  #
+        blosum62_probability[aa][bb] = Qab
+        print(Qab)
+        sum_ab += Qab
+        # print("qab=", Qab)
+print(sum_ab)
+
 
 def _energy_of_alignment(alignment_list: list[list[str, int, int]], n: int,
-                         reference_frequencies: dict) -> float:
+                         reference_frequencies: dict, weighting=False) -> float:
 
     # Weighting: first calculate the number of different amino acids at all positions:
     pos_count = []
@@ -136,15 +169,30 @@ def _energy_of_alignment(alignment_list: list[list[str, int, int]], n: int,
     for i in range(n):
         aa_table = dict.fromkeys(reference_frequencies, 0)  # use custom reference?
         aa_table_weighted = dict.fromkeys(reference_frequencies, 0)
+        total_aas = 0
         for j in range(len(alignment_list)):
             [sequence, index, old_index] = alignment_list[j]
             # print(sequence, index, alignment_index, i)
             aa_table[sequence[index + i]] += 1
-            aa_table_weighted[sequence[index + i]] += weights[j]
+            aa_table_weighted[sequence[index + i]] += 1
+            total_weight += weights[j]
+            total_aas += 1
         for aa in aa_table.keys():
             Cpa = aa_table[aa]
-            Fpa = aa_table_weighted[aa] / total_weight
-            Ppa = (alpha * Fpa + beta * 0.05) / (alpha + beta)  # TODO - no sequence weighting or pseudocount correction for now; just adding 1
+            if weighting:
+                Fpa = aa_table_weighted[aa] / total_weight
+            else:
+                Fpa = aa_table[aa] / total_aas
+            Gpa = 0
+            for bb in aa_table.keys():
+                # allow a=b?
+                Fpb = aa_table[bb] / total_aas
+                #print("fpb=", Fpb)
+                Qab = blosum62_probability[aa][bb]
+                #print("qab=", Qab)
+                Gpa += Fpb / Qb * Qab
+            # print("gpa=", Gpa)
+            Ppa = (alpha * Fpa + beta * Gpa) / (alpha + beta)
             Qa = reference_frequencies[aa]
             E += Cpa * math.log(Ppa / Qa)  # correct base?
     return E
@@ -154,11 +202,3 @@ def _energy_of_alignment(alignment_list: list[list[str, int, int]], n: int,
 def _generate_weights(sequence_list: list[str], threshold: float) -> dict[str, float]:
     pass
 
-def _normalized_reference_frequencies(reference_frequencies):
-    normalized_reference_frequencies = {}
-    total = 0
-    for aa in reference_frequencies.keys():
-        total += reference_frequencies[aa]
-    for aa in reference_frequencies.keys():
-        normalized_reference_frequencies[aa] = reference_frequencies[aa] / total
-    return normalized_reference_frequencies
