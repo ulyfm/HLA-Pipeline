@@ -117,26 +117,25 @@ def gibbs_cluster(peptides: list[str], n: int, reference_frequencies=None) -> li
 
 blosum62 = blosum.BLOSUM(62)
 blosum62_probability = {}
-aa_table = dict.fromkeys(uniprot_frequency, 0)
+_aa_table = dict.fromkeys(uniprot_frequency, 0)
 sum_ab = 0
-for aa in aa_table.keys():
-    blosum62_probability[aa] = dict()
-    for bb in aa_table.keys():
+for _aa in _aa_table.keys():
+    blosum62_probability[_aa] = dict()
+    for _bb in _aa_table.keys():
         # print(aa, bb)
-        Sab = blosum62[aa][bb]
-        Qb = normalized_uniprot[bb]
-        Qa = normalized_uniprot[aa]
-        Qab = Qb * Qa * math.exp(Sab * 0.31723)  #
-        blosum62_probability[aa][bb] = Qab
-        print(Qab)
-        sum_ab += Qab
+        _Sab = blosum62[_aa][_bb]
+        _Qb = normalized_uniprot[_bb]
+        _Qa = normalized_uniprot[_aa]
+        _Qab = _Qb * _Qa * math.exp(_Sab * 0.31723)  #
+        blosum62_probability[_aa][_bb] = _Qab
+        print(_Qab)
+        sum_ab += _Qab
         # print("qab=", Qab)
 print(sum_ab)
 
 
 def _energy_of_alignment(alignment_list: list[list[str, int, int]], n: int,
-                         reference_frequencies: dict, weighting=False) -> float:
-
+                         reference_frequencies: dict) -> float:
     # Weighting: first calculate the number of different amino acids at all positions:
     pos_count = []
     for i in range(n):
@@ -148,50 +147,25 @@ def _energy_of_alignment(alignment_list: list[list[str, int, int]], n: int,
                 pos_count[i][res] = 1
             else:
                 pos_count[i][res] += 1
-    # Weighting: next, generate weights for each seq via Henikoff/Henikoff formula.
-    weights = []
-    for [sequence, index, old_index] in alignment_list:
-        weight = 0
-        for i in range(n):
-            res = sequence[i + index]
-            weight += 1 / (len(pos_count[i]) * pos_count[i][res])
-        weights.append(weight)
-    # Calculate effective sequence number for Henikoff method:
-    alpha = 0
-    for i in range(n):
-        alpha += len(pos_count[i])
-    alpha = alpha / n - 1
+    alpha = 20
     beta = 50  # magic number for Henikoff method
     E = 0
-    total_weight = 0
-    for weight in weights:
-        total_weight += weight
     for i in range(n):
         aa_table = dict.fromkeys(reference_frequencies, 0)  # use custom reference?
-        aa_table_weighted = dict.fromkeys(reference_frequencies, 0)
         total_aas = 0
         for j in range(len(alignment_list)):
             [sequence, index, old_index] = alignment_list[j]
-            # print(sequence, index, alignment_index, i)
             aa_table[sequence[index + i]] += 1
-            aa_table_weighted[sequence[index + i]] += 1
-            total_weight += weights[j]
             total_aas += 1
         for aa in aa_table.keys():
             Cpa = aa_table[aa]
-            if weighting:
-                Fpa = aa_table_weighted[aa] / total_weight
-            else:
-                Fpa = aa_table[aa] / total_aas
+            Fpa = aa_table[aa] / total_aas
             Gpa = 0
             for bb in aa_table.keys():
-                # allow a=b?
                 Fpb = aa_table[bb] / total_aas
-                #print("fpb=", Fpb)
                 Qab = blosum62_probability[aa][bb]
-                #print("qab=", Qab)
+                Qb = reference_frequencies[bb]
                 Gpa += Fpb / Qb * Qab
-            # print("gpa=", Gpa)
             Ppa = (alpha * Fpa + beta * Gpa) / (alpha + beta)
             Qa = reference_frequencies[aa]
             E += Cpa * math.log(Ppa / Qa)  # correct base?
