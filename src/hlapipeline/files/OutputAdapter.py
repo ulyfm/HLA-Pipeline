@@ -101,3 +101,10 @@ class OutputAdapter:
         Saves the current version of the overview file
         """
         self._final_table.to_csv(self._final_table_path)
+
+    def save_file(self, file_base_name: str, directory_name: str, data: str):
+        dir_path = os.path.join(self._output_dir, directory_name)
+        if not os.path.exists(dir_path):
+            os.mkdir(dir_path)
+        with open(os.path.join(dir_path, file_base_name), "w") as file:
+            file.write(data)

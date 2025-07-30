@@ -206,12 +206,12 @@ class HLAPipeline:
         """
         if class2:
             seqs = self._data_table['HLAP_sequence'].tolist()
-            aligned_seqs = gibbs_cluster(seqs, 9)
+            aligned_seqs = gibbs_cluster(self._output, self._name_before_group, seqs, 9)
             finalseqs = []
             for (seq, index, old_index) in aligned_seqs:
                 finalseqs.append(seq[index:index + 9])
             motif = compute_motif(finalseqs,
-                                  reference_freqs=uniprot_frequency)  # .rename(columns=dict(zip(list(range(0, i)), list(range(1, i + 1)))))
+                                  reference_freqs=uniprot_frequency).rename(columns=dict(zip(list(range(0, 9)), list(range(1, 9 + 1)))))
             logo_dir = self._output.init_logo_directory(self._name_before_group)
             svg_logo(motif, os.path.join(logo_dir, "9mer_logo.svg"), color_scheme='chemistry')
 

@@ -5,6 +5,8 @@ from copy import deepcopy
 from collections import OrderedDict
 import blosum
 
+from hlapipeline.files.OutputAdapter import OutputAdapter
+
 aa_alphabet = [aa for aa in 'ARNDCQEGHILKMFPSTWYVBZX-']
 
 uniprot_frequency = {'A': 8.25,
@@ -28,6 +30,7 @@ uniprot_frequency = {'A': 8.25,
                      'Y': 2.92,
                      'V': 6.87}
 
+
 def _normalized_reference_frequencies(reference_frequencies):
     normalized_reference_frequencies = {}
     total = 0
@@ -37,15 +40,20 @@ def _normalized_reference_frequencies(reference_frequencies):
         normalized_reference_frequencies[aa] = reference_frequencies[aa] / total
     return normalized_reference_frequencies
 
+
 normalized_uniprot = _normalized_reference_frequencies(uniprot_frequency)
+
 
 # Input: peptides list with length >= n
 # Input: target length n
 # Input: reference frequencies (optional)
 # Output: array of original strings as tuples along with the offset corresponding to the alignment and a copy of the
 #         offset for uses where the previous state of the list is stored.
-def gibbs_cluster(peptides: list[str], n: int, reference_frequencies=None) -> list[list[str, int, int]]:
-    print(peptides)
+def gibbs_cluster(output, name_before_group, peptides: list[str], n: int, reference_frequencies=None, moves_per_step_factor=20,
+                  T_start=0.15, T_end=0.01, T_steps=10, frameshift_frequency=0.005) -> list[list[str, int, int]]:
+    #print(peptides)
+    num_peptides = len(peptides)
+
     if reference_frequencies is None:
         reference_frequencies = uniprot_frequency
     normalized_reference_frequencies = _normalized_reference_frequencies(reference_frequencies)
@@ -53,44 +61,43 @@ def gibbs_cluster(peptides: list[str], n: int, reference_frequencies=None) -> li
     alignment_list = []
     for peptide in peptides:
         if len(peptide) >= n:
-            random_start_index = random.randint(0, len(peptide) - n)
+            random_start_index = random.randint(0, (len(peptide) - n))
             alignment_list.append(
                 [peptide, random_start_index, random_start_index])  # want to do this multiple times?
         else:
             print("skipping short sequence", peptide, "in logo generation")
+    _save_debug_cluster(output, name_before_group, alignment_list, n, "before_clustering.txt")
     # Now that the list
-    current_E = _energy_of_alignment(alignment_list, 9, normalized_reference_frequencies)
-    moves = 5000
-    T = 0.15
-    T_end = 0.01
-    T_steps = 10
+    current_E = _energy_of_alignment(alignment_list, n, normalized_reference_frequencies)
+    moves = num_peptides * moves_per_step_factor
+    T = T_start
     # Generate a list of steps so that start and end can be defined, due to division inaccuracies
     steps_list = [T]
     step_size = (T - T_end) / (T_steps - 1)
     for i in range(1, T_steps - 1):
         steps_list.append(T - step_size * i)
     steps_list.append(T_end)
-    print(steps_list)
+    #print(steps_list)
 
     for step in steps_list:
         print("starting at T=", step)
         for j in range(moves):
-            if random.random() >= 0.001:  # move type 1 (single sequence move) - 1 in 1000
+            if random.random() >= frameshift_frequency:  # move type 1 (single sequence move) - 1 in 200
                 move_index = random.randrange(0, len(alignment_list))
-                alignment_list[move_index][2] = alignment_list[move_index][1] # Save old value
+                alignment_list[move_index][2] = alignment_list[move_index][1]  # Save old value
                 alignment_list[move_index][1] = random.randint(0, len(alignment_list[move_index][0]) - n)
-                new_E = _energy_of_alignment(alignment_list,  9, normalized_reference_frequencies)
+                new_E = _energy_of_alignment(alignment_list, n, normalized_reference_frequencies)
                 try:
                     P = min(1.0, math.exp((new_E - current_E) / step))
                 except OverflowError:
                     print("newE", new_E, "currentE", current_E, "step", step)
-                    P = 0
+                    P = 1
                 if random.random() <= P:
                     current_E = new_E
                 else:
                     alignment_list[move_index][1] = alignment_list[move_index][2]  # Restore old value
             else:  # move type 2 (frame shift move)
-                move_amount = random.randint(0, 18) - 9
+                move_amount = random.randint(0, n*2) - n
                 for i in range(len(alignment_list)):
                     # print(new_alignment_list[i])
                     if move_amount < 0:
@@ -104,16 +111,23 @@ def gibbs_cluster(peptides: list[str], n: int, reference_frequencies=None) -> li
                         alignment_list[i][2] = alignment_list[i][1]
                         alignment_list[i][1] += positive
 
-                new_E = _energy_of_alignment(alignment_list, 9, normalized_reference_frequencies)
-                P = min(1.0, math.exp((new_E - current_E) / step))
+                new_E = _energy_of_alignment(alignment_list, n, normalized_reference_frequencies)
+                #print("Type 2:", "new_E:", new_E, "current_E:", current_E, "step:", step)
+                try:
+                    P = min(1.0, math.exp((new_E - current_E) / step))
+                except OverflowError:
+                    print("newE", new_E, "currentE", current_E, "step", step)
+                    P = 1
                 if random.random() <= P:
                     current_E = new_E
                 else:
                     for i in range(len(alignment_list)):
                         alignment_list[i][1] = alignment_list[i][2]
 
-    print(alignment_list)
+    #print(alignment_list)
+    _save_debug_cluster(output, name_before_group, alignment_list, n, "after_clustering.txt")
     return alignment_list
+
 
 blosum62 = blosum.BLOSUM(62)
 blosum62_probability = {}
@@ -175,4 +189,16 @@ def _energy_of_alignment(alignment_list: list[list[str, int, int]], n: int,
 # assuming sequence list does not contain duplicates.
 def _generate_weights(sequence_list: list[str], threshold: float) -> dict[str, float]:
     pass
+
+
+def _save_debug_cluster(output: OutputAdapter, name_before_group: str, peptides: list[list[str, int, int]], n, filename: str):
+    file_contents = ""
+    max_index = 0
+    for line in peptides:
+        if line[1] > max_index:
+            max_index = line[1]
+    spaces = " " * max_index
+    for line in peptides:
+        file_contents += (spaces[0:(max_index - line[1])] + line[0][0:line[1]] + "[" + line[0][line[1]:line[1]+n] + "]" + line[0][(line[1]+n):]) + "\n"
+    output.save_file(name_before_group + "_" + filename, "clustering_qc", file_contents)
 
