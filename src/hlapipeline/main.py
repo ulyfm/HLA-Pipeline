@@ -24,7 +24,6 @@ def main():
     parser.add_argument('-t', '--overview', default="final_table.csv")
     parser.add_argument('-bulkcsv')
     parser.add_argument('-bulkdir')
-    parser.add_argument('--class2', action=argparse.BooleanOptionalAction)
     parser.add_argument('--peptide', action=argparse.BooleanOptionalAction)
     parser.add_argument('--skipcleanup', action=argparse.BooleanOptionalAction)
     parser.add_argument('--skipcotransduced', action=argparse.BooleanOptionalAction)
@@ -68,7 +67,7 @@ def main():
             print("File loaded.")
             # Generate final table output (i.e. metadata).
             result = pipeline.get_result(args.skipcleanup, args.skipcotransduced, args.assumecotransduced,
-                                         args.skipdataviz, args.class2, database_features=args.database)
+                                         args.skipdataviz, database_features=args.database)
             output.append_overview_data(result)
             # Generate complete output for inclusion in union table
             detailed_table = pipeline.get_data_table()[['HLAP_sequence', 'HLAP_length', 'HLAP_master_accessions',
@@ -115,7 +114,7 @@ def main():
                 print("File loaded.")
                 # Generate output.
                 result = pipeline.get_result(args.skipcleanup, args.skipcotransduced, False,
-                                             args.skipdataviz, args.class2, cotransduced_peptide=cotrans_peptides)
+                                             args.skipdataviz, cotransduced_peptide=cotrans_peptides)
                 subset_output.append_overview_data(result)
                 overall_output.append_overview_data(result)
                 detailed_table = pipeline.get_data_table()[['sequence', 'length', 'Master Protein Accessions',
