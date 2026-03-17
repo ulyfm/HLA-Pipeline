@@ -113,7 +113,7 @@ class LocalDatabase:
         """
         print("Local database: downloading go.obo")
         if self._force_update or not os.path.exists(os.path.join(self._db_folder, "go.obo")):
-            urllib.request.urlretrieve("http://purl.obolibrary.org/obo/go.obo",
+            urllib.request.urlretrieve("https://current.geneontology.org/ontology/go.obo",
                                        os.path.join(self._db_folder, "go.obo"))
 
         goterms = pd.DataFrame(columns=['GO_ID', 'GO Term'])
