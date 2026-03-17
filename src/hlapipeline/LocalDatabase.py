@@ -113,6 +113,9 @@ class LocalDatabase:
         """
         print("Local database: downloading go.obo")
         if self._force_update or not os.path.exists(os.path.join(self._db_folder, "go.obo")):
+            opener = urllib.request.build_opener()
+            opener.addheaders = [('User-agent', 'Mozilla/5.0')]
+            urllib.request.install_opener(opener)
             urllib.request.urlretrieve("https://current.geneontology.org/ontology/go.obo",
                                        os.path.join(self._db_folder, "go.obo"))
 
