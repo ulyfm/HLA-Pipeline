@@ -242,7 +242,6 @@ class HLAPipeline:
         self._data_table = self._data_table.merge(self._db_access.get_table(), left_on='HLAP_accession',
                                                   right_on='Accession', how='left',
                                                   suffixes=(None, "_DB"))
-        self._data_table.drop('HLAP_accession_DB', axis=1, inplace=True)
 
     def get_result(self, skip_cleanup: bool, skip_cotransduced: bool, assumecotransduced: bool, skip_dataviz: bool,
                    cotransduced_peptide='', database_features=False) -> dict:
