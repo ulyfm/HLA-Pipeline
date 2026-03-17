@@ -79,9 +79,8 @@ class LocalDatabase:
                 if not pd.isna(el):
                     ret.append(el)
             return "; ".join(ret)
-
-        # To eliminate duplicate accessions, all data is merged semicolon-separated.
-        self._go_table = self._go_table.groupby(['Accession'], as_index=False).agg({
+        
+        agg_dict = {
             'Ensembl': _join_no_na,
             'GO Name': _join_no_na,
             'GO Protein Name': _join_no_na,
@@ -101,8 +100,12 @@ class LocalDatabase:
             'Molecular function': _join_no_na,
             'RNA single cell type specific nTPM': _join_no_na,
             'RNA tissue cell type enrichment': _join_no_na
-        })
-
+        }
+        
+        existing_agg = {k: v for k, v in agg_dict.items() if k in self._go_table.columns}
+        
+        # To eliminate duplicate accessions, all data is merged semicolon-separated.
+        self._go_table = self._go_table.groupby(['Accession'], as_index=False).agg(existing_agg)
         self._go_table.to_csv(os.path.join(self._db_folder, "go_cc_table.csv"))
         print("Local database: local files updated.")
 
@@ -118,6 +121,7 @@ class LocalDatabase:
             urllib.request.install_opener(opener)
             urllib.request.urlretrieve("https://current.geneontology.org/ontology/go.obo",
                                        os.path.join(self._db_folder, "go.obo"))
+            
 
         goterms = pd.DataFrame(columns=['GO_ID', 'GO Term'])
         index = 0
@@ -190,11 +194,12 @@ class LocalDatabase:
                                compression='zip',
                                sep='\t',
                                dtype=str)
-        pa_table = pa_table[['Uniprot', 'Gene', 'Gene description', 'Ensembl', 'Subcellular location',
+        pa_cols = ['Uniprot', 'Gene', 'Gene description', 'Ensembl', 'Subcellular location',
                              'RNA tissue specificity', 'RNA tissue distribution', 'Evidence',
                              'RNA tissue specific nTPM', 'Tissue expression cluster', 'Biological process',
                              'Molecular function', 'RNA single cell type specific nTPM',
-                             'RNA tissue cell type enrichment']]
+                             'RNA tissue cell type enrichment']
+        pa_table = pa_table[[c for c in pa_cols if c in pa_table.columns]]
         print("PA table columns:", pa_table.columns)
         pa_table = pa_table.rename(columns={'Uniprot': 'Accession'})
         # os.remove(os.path.join(self._db_folder, "proteinatlas.tsv.zip"))
@@ -207,7 +212,7 @@ class LocalDatabase:
         """
         print("Local database: downloading rna_celline.tsv.zip")
         if self._force_update or not os.path.exists(os.path.join(self._db_folder, "rna_celline.tsv.zip")):
-            urllib.request.urlretrieve("https://www.proteinatlas.org/download/rna_celline.tsv.zip",
+            urllib.request.urlretrieve("https://www.proteinatlas.org/download/tsv/rna_celline.tsv.zip",
                                        os.path.join(self._db_folder, "rna_celline.tsv.zip"))
         print("Local database: parsing rna_celline.tsv.zip")
         pa_rna_table = pd.read_csv(os.path.join(self._db_folder, "rna_celline.tsv.zip"),
