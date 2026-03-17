@@ -240,7 +240,7 @@ class HLAPipeline:
                 return ''
 
         self._data_table = self._data_table.merge(self._db_access.get_table(), left_on='HLAP_accession',
-                                                  right_on='HLAP_accession', how='left',
+                                                  right_on='Accession', how='left',
                                                   suffixes=(None, "_DB"))
         self._data_table.drop('HLAP_accession_DB', axis=1, inplace=True)
 
