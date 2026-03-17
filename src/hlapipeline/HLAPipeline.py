@@ -239,13 +239,10 @@ class HLAPipeline:
             else:
                 return ''
 
-        for i in range(0, self._data_table['HLAP_accession'].str.split("; ")):
-            self._data_table['HLAP_accession' + str(i)] = self._data_table['HLAP_accession'].apply(
-                lambda x: _split_accession(x, i))
-            self._data_table = self._data_table.merge(self._db_access.get_table(), left_on='HLAP_accession' + str(i),
-                                                      right_on='HLAP_accession', how='left',
-                                                      suffixes=(None, "_" + str(i)))
-            self._data_table.drop('HLAP_accession_' + str(i), axis=1, inplace=True)
+        self._data_table = self._data_table.merge(self._db_access.get_table(), left_on='HLAP_accession',
+                                                  right_on='HLAP_accession', how='left',
+                                                  suffixes=(None, "_DB"))
+        self._data_table.drop('HLAP_accession_DB', axis=1, inplace=True)
 
     def get_result(self, skip_cleanup: bool, skip_cotransduced: bool, assumecotransduced: bool, skip_dataviz: bool,
                    cotransduced_peptide='', database_features=False) -> dict:
